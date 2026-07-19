@@ -23,7 +23,7 @@ cd "$SAVED" >/dev/null
 APP_NAME="Gradle"
 APP_BASE_NAME=`basename "$0"`
 
-DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+DEFAULT_JVM_OPTS="-Xmx64m -Xms64m"
 MAX_FD="maximum"
 
 warn () {
@@ -62,7 +62,7 @@ Please set the JAVA_HOME variable in your environment to match the
 location of your Java installation."
 fi
 
-DEFAULT_JVM_OPTS="$DEFAULT_JVM_OPTS \"-Dfile.encoding=UTF-8\""
+DEFAULT_JVM_OPTS="$DEFAULT_JVM_OPTS -Dfile.encoding=UTF-8"
 
 exec "$JAVACMD" \
     $DEFAULT_JVM_OPTS \
