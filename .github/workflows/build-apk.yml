@@ -24,17 +24,16 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Debug - before SDK
+        run: pwd && ls -la gradlew && ls -la gradle/wrapper/
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: 'platforms;android-34 build-tools;34.0.0'
 
-      - name: Debug - list files
-        run: |
-          pwd
-          ls -la
-          ls -la gradle/wrapper/
-          file gradlew
+      - name: Debug - after SDK
+        run: pwd && ls -la gradlew && ls -la gradle/wrapper/
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
