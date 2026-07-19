@@ -281,6 +281,7 @@ Agent: /agents /agent /approve /reject /pause /resume /stop /restart
 Status: /status /alerts /ack /tokens /pulse /log
 Commands: /cmd /tell /ask /sethome /verify /verifier
 Connection: /connect /disconnect /mock
+CI: /loopstatus
     """.trimIndent()
 
     companion object {
