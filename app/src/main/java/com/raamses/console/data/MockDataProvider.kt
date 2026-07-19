@@ -58,7 +58,7 @@ class MockDataProvider {
             status = "ACTIVE",
             objective = "Add OAuth2 support to API layer",
             currentOperation = "Writing token refresh logic",
-            lastVerifiedWork = now - 4,
+            lastVerifiedWorkSecAgo = now - 4,
             lastVerifiedDescription = "Writing: auth/refresh.rs — cargo check running",
             tokenUsage = TokenUsageData(total = 89_700, lastHour = 5_100, today = 31_200),
             subAgentCount = 1,
@@ -125,7 +125,7 @@ class MockDataProvider {
             severity = "warning",
             title = "Report Mismatch",
             message = "Gateway Server claims 85% complete; verified tasks indicate 48%",
-            timestamp = now - 60,
+            timestampSec = now - 60,
             requiresAck = false
         ),
         ConsoleAlert(
@@ -133,7 +133,7 @@ class MockDataProvider {
             severity = "info",
             title = "Test Failures",
             message = "Gateway: 18 passed, 2 failed — gateway_tests.cpp",
-            timestamp = now - 5,
+            timestampSec = now - 5,
             requiresAck = false
         )
     )

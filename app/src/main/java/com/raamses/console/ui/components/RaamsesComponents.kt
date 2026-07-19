@@ -112,7 +112,7 @@ fun AgentStatusCard(
                     maxLines = 1,
                     modifier = Modifier.weight(1f)
                 )
-                agent.lastVerifiedWork?.let {
+                agent.lastVerifiedWorkSecAgo?.let {
                     Text(
                         text = formatSecondsAgo(it),
                         style = MaterialTheme.typography.bodySmall,

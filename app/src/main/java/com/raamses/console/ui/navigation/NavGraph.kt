@@ -179,7 +179,7 @@ private fun processMockCommand(command: String, mockProvider: MockDataProvider):
             CPU:     ${(h.cpuPercent * 100).toInt()}%
             Memory:  ${(h.memoryPercent * 100).toInt()}%
             Disk:    ${(h.diskPercent * 100).toInt()}%
-            Uptime:  ${formatDuration(h.uptimeSeconds)}
+            Uptime:  ${h.uptimeDisplay}
             Agents:  ${h.agentCount} total, ${h.activeAgentCount} active, ${h.blockedAgentCount} blocked
             """.trimIndent()
         }

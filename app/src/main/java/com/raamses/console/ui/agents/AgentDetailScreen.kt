@@ -86,7 +86,7 @@ fun AgentDetailScreen(
                         )
                     }
 
-                    agent.lastVerifiedWork?.let {
+                    agent.lastVerifiedWorkSecAgo?.let {
                         Spacer(Modifier.height(12.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -171,39 +171,7 @@ fun AgentDetailScreen(
                         }
                     }
 
-                    // Checklist
-                    if (agent.checklist.isNotEmpty()) {
-                        Spacer(Modifier.height(12.dp))
-                        agent.checklist.forEach { item ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                val (icon, color) = when (item.status) {
-                                    ItemStatus.DONE -> "✓" to StatusActive
-                                    ItemStatus.IN_PROGRESS -> "~" to AccentBlue
-                                    ItemStatus.PENDING -> " " to TextMuted
-                                    ItemStatus.FAILED -> "✗" to SeverityCritical
-                                }
-                                Text(
-                                    text = "[$icon]",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = color,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.width(28.dp)
-                                )
-                                Text(
-                                    text = item.label,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (item.status == ItemStatus.PENDING) TextMuted else TextPrimary
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+                    // Work Pulse
         }
 
         // ── Work Pulse ──

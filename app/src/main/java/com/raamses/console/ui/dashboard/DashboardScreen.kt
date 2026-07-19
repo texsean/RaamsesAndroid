@@ -105,7 +105,7 @@ private fun SystemStatusBar(health: ServerHealth) {
             StatusChip("CPU", "${(health.cpuPercent * 100).toInt()}%", if (health.cpuPercent > 0.8f) SeverityWarning else AccentGreen)
             StatusChip("MEM", "${(health.memoryPercent * 100).toInt()}%", if (health.memoryPercent > 0.8f) SeverityWarning else AccentGreen)
             StatusChip("DISK", "${(health.diskPercent * 100).toInt()}%", if (health.diskPercent > 0.85f) SeverityWarning else AccentGreen)
-            StatusChip("UP", formatUptime(health.uptimeSeconds), TextSecondary)
+            StatusChip("UP", health.uptimeDisplay, TextSecondary)
         }
         Divider(color = Border, thickness = 0.5.dp)
         Row(
