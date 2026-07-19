@@ -285,21 +285,4 @@ fun AlertCard(alert: ConsoleAlert, onAck: (() -> Unit)? = null, modifier: Modifi
 }
 
 // ═══════════════════════════════════════════════
-// Utility
-// ═══════════════════════════════════════════════
-
-fun formatSecondsAgo(epoch: Long): String {
-    val diff = (System.currentTimeMillis() / 1000) - epoch
-    return when {
-        diff < 60 -> "${diff}s"
-        diff < 3600 -> "${diff / 60}m"
-        diff < 86400 -> "${diff / 3600}h"
-        else -> "${diff / 86400}d"
-    }
-}
-
-fun formatTokenCount(count: Long): String = when {
-    count >= 1_000_000 -> "${count / 1_000_000}.${(count % 1_000_000) / 100_000}M"
-    count >= 1_000 -> "${count / 1_000}.${(count % 1_000) / 100}K"
-    else -> count.toString()
-}
+// Utility functions are in FormatUtils.kt (no Compose dependency)
