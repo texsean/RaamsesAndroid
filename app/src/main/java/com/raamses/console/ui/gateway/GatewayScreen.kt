@@ -1,5 +1,6 @@
 package com.raamses.console.ui.gateway
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,120 +18,143 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.raamses.console.data.models.*
 import com.raamses.console.ui.theme.*
+import kotlinx.coroutines.launch
+import java.util.UUID
 
 @Composable
 fun GatewayScreen(
     messages: List<GatewayMessage>,
     onSendCommand: (String) -> Unit,
-    connectionState: ConnectionState,
-    onConnectClick: () -> Unit,
-    onDisconnectClick: () -> Unit,
-    modifier: Modifier = Modifier
+    isConnected: Boolean,
+    serverHost: String = "",
+    onConnectClick: () -> Unit = {}
 ) {
     var inputText by remember { mutableStateOf("") }
     var showSlashMenu by remember { mutableStateOf(false) }
     var slashFilter by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val focusRequester = remember { FocusRequester() }
+    val coroutineScope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
 
+    // Auto-scroll to bottom when new messages arrive
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
     }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    // Focus input on launch
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
+    // Determine if slash menu should show
     LaunchedEffect(inputText) {
         showSlashMenu = inputText.startsWith("/") && !inputText.contains(" ")
         slashFilter = if (showSlashMenu) inputText.removePrefix("/").lowercase() else ""
     }
 
-    Box(modifier = modifier.fillMaxSize().background(Background)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Background)
+    ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Connection bar
-            ConnectionBar(connectionState, onConnectClick, onDisconnectClick)
+            // ── Connection Bar ──
+            ConnectionBar(isConnected, serverHost, onConnectClick)
 
-            // Messages
+            // ── Message List ──
             LazyColumn(
                 state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(vertical = 12.dp)
             ) {
                 if (messages.isEmpty()) {
-                    item { WelcomeMessage() }
+                    item {
+                        WelcomeMessage()
+                    }
                 }
                 items(messages, key = { it.id }) { msg ->
-                    MessageBubble(msg)
+                    GatewayMessageBubble(msg)
                 }
             }
 
-            // Slash overlay
+            // ── Slash Command Overlay ──
             if (showSlashMenu && slashFilter.isNotEmpty() && inputText.length > 1) {
                 SlashCommandOverlay(
                     filter = slashFilter,
                     onSelect = { cmd ->
                         inputText = cmd.command + " "
                         showSlashMenu = false
+                        focusRequester.requestFocus()
                     },
                     onDismiss = { showSlashMenu = false }
                 )
             }
 
-            // Input bar — also handles raw chat (no slash) via /tell passthrough
+            // ── Command Input Bar ──
             CommandInputBar(
                 text = inputText,
                 onTextChange = { inputText = it },
                 onSend = {
                     if (inputText.isNotBlank()) {
-                        // If no slash prefix, treat as chat pass-through
-                        val text = if (!inputText.startsWith("/")) "/tell all $inputText" else inputText.trim()
-                        onSendCommand(text)
+                        onSendCommand(inputText.trim())
                         inputText = ""
                         showSlashMenu = false
                     }
                 },
                 focusRequester = focusRequester,
-                isConnected = connectionState.connected
+                isConnected = isConnected
             )
         }
     }
 }
 
 @Composable
-private fun ConnectionBar(state: ConnectionState, onConnect: () -> Unit, onDisconnect: () -> Unit) {
+private fun ConnectionBar(isConnected: Boolean, host: String, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().background(Surface).padding(horizontal = 16.dp, vertical = 10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Surface)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(8.dp).clip(CircleShape)
-                    .background(if (state.connected) StatusActive else StatusBlocked)
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(if (isConnected) StatusActive else StatusBlocked)
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                if (state.connected) "CONNECTED" else "DISCONNECTED",
+                text = if (isConnected) "CONNECTED" else "DISCONNECTED",
                 style = MaterialTheme.typography.labelMedium,
-                color = if (state.connected) StatusActive else StatusBlocked
+                color = if (isConnected) StatusActive else StatusBlocked
             )
-            if (state.connected) {
+            if (isConnected && host.isNotEmpty()) {
                 Spacer(Modifier.width(8.dp))
-                Text("${state.host}:${state.port}", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                Spacer(Modifier.width(8.dp))
-                Text(state.tier.uppercase(), style = MaterialTheme.typography.bodySmall, color = AccentBlue)
+                Text(
+                    text = host,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMuted
+                )
             }
         }
-        if (state.connected) {
-            TextButton(onClick = onDisconnect) {
-                Text("DISCONNECT", color = SeverityWarning, style = MaterialTheme.typography.labelMedium)
-            }
-        } else {
-            TextButton(onClick = onConnect) {
+        if (!isConnected) {
+            TextButton(onClick = onClick) {
                 Text("CONNECT", color = AccentBlue, style = MaterialTheme.typography.labelMedium)
             }
         }
@@ -139,20 +163,42 @@ private fun ConnectionBar(state: ConnectionState, onConnect: () -> Unit, onDisco
 
 @Composable
 private fun WelcomeMessage() {
-    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Spacer(Modifier.height(48.dp))
-        Text("RAAMSES GATEWAY", style = MaterialTheme.typography.displayLarge, color = AccentBlue)
+        Text(
+            text = "RAAMSES GATEWAY",
+            style = MaterialTheme.typography.displayLarge,
+            color = AccentBlue
+        )
         Spacer(Modifier.height(8.dp))
-        Text("Agent Command & Control", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
-        Spacer(Modifier.height(12.dp))
-        Text("Type / for commands, or just type to chat with agents", style = MaterialTheme.typography.bodyMedium, color = TextMuted)
+        Text(
+            text = "Agent Command & Control",
+            style = MaterialTheme.typography.bodyLarge,
+            color = TextSecondary
+        )
+        Spacer(Modifier.height(24.dp))
+        Text(
+            text = "Type / for commands",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextMuted
+        )
         Spacer(Modifier.height(16.dp))
+        // Quick command hints
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("/agents", "/status", "/verify all", "/help").forEach { cmd ->
+            listOf("/agents", "/status", "/alerts", "/help").forEach { cmd ->
                 SuggestionChip(
-                    onClick = {},
-                    label = { Text(cmd, style = MaterialTheme.typography.bodySmall, color = AccentBlue) },
-                    colors = SuggestionChipDefaults.suggestionChipColors(containerColor = SurfaceVariant),
+                    onClick = { /* pre-fill */ },
+                    label = {
+                        Text(cmd, style = MaterialTheme.typography.bodySmall, color = AccentBlue)
+                    },
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = SurfaceVariant
+                    ),
                     border = null
                 )
             }
@@ -161,35 +207,112 @@ private fun WelcomeMessage() {
 }
 
 @Composable
-private fun MessageBubble(msg: GatewayMessage) {
+private fun GatewayMessageBubble(msg: GatewayMessage) {
     val alignment = if (msg.isFromUser) Alignment.End else Alignment.Start
-    val bgColor = if (msg.isFromUser) (if (msg.isError) SeverityCritical else AccentBlue).copy(alpha = 0.15f)
-    else SurfaceVariant
+    val bgColor = if (msg.isFromUser) {
+        if (msg.isError) SeverityCritical.copy(alpha = 0.15f) else AccentBlue.copy(alpha = 0.15f)
+    } else {
+        SurfaceVariant
+    }
+    val borderColor = if (msg.isFromUser) {
+        if (msg.isError) SeverityCritical else AccentBlue
+    } else {
+        Border
+    }
 
-    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = alignment) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = alignment
+    ) {
         Box(
             modifier = Modifier
                 .widthIn(max = 340.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(bgColor)
+                .then(
+                    Modifier.drawWithBorder(borderColor, RoundedCornerShape(12.dp))
+                )
                 .padding(12.dp)
         ) {
             Column {
                 if (msg.command != null) {
-                    Text(msg.command, style = MaterialTheme.typography.labelMedium, color = SlashHighlight, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = msg.command.command,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = SlashHighlight,
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(Modifier.height(4.dp))
                 }
                 Text(
-                    msg.text,
+                    text = msg.text,
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (msg.isError) AccentRed else TextPrimary
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    formatTimestamp(msg.timestampSec),
+                    text = formatTimestamp(msg.timestamp),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextMuted
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SlashCommandOverlay(
+    filter: String,
+    onSelect: (SlashCommand) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val filtered = SlashCommand.entries.filter {
+        it.command.contains(filter, ignoreCase = true) ||
+        it.description.contains(filter, ignoreCase = true)
+    }
+
+    if (filtered.isEmpty()) return
+
+    val grouped = filtered.groupBy { it.category }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = Surface,
+        shadowElevation = 8.dp
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            grouped.forEach { (category, commands) ->
+                Text(
+                    text = category.label.uppercase(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextMuted,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+                commands.forEach { cmd ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(cmd) }
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = cmd.command,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = SlashHighlight,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.width(100.dp)
+                        )
+                        Text(
+                            text = cmd.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                }
             }
         }
     }
@@ -203,36 +326,59 @@ private fun CommandInputBar(
     focusRequester: FocusRequester,
     isConnected: Boolean
 ) {
-    Surface(modifier = Modifier.fillMaxWidth(), color = CommandBarBackground, shadowElevation = 4.dp) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = CommandBarBackground,
+        shadowElevation = 4.dp
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Slash prompt
             Text(
-                if (text.startsWith("/")) "/" else ">",
+                text = "/",
                 style = MaterialTheme.typography.titleLarge,
-                color = if (text.startsWith("/")) SlashHighlight else AccentGreen,
+                color = if (text.startsWith("/")) SlashHighlight else TextMuted,
                 fontWeight = FontWeight.Bold
             )
             Spacer(Modifier.width(8.dp))
             BasicTextField(
                 value = text,
                 onValueChange = onTextChange,
-                modifier = Modifier.weight(1f).focusRequester(focusRequester),
-                textStyle = TextStyle(color = TextPrimary, fontSize = 15.sp, fontFamily = MonoFont),
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
+                textStyle = TextStyle(
+                    color = TextPrimary,
+                    fontSize = 15.sp,
+                    fontFamily = MonoFont
+                ),
                 cursorBrush = SolidColor(CommandCursor),
                 singleLine = true,
                 decorationBox = { innerTextField ->
                     if (text.isEmpty()) {
-                        Text("command or chat...", style = MaterialTheme.typography.bodyMedium, color = TextMuted)
+                        Text(
+                            text = "command...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextMuted
+                        )
                     }
                     innerTextField()
                 }
             )
             Spacer(Modifier.width(8.dp))
-            IconButton(onClick = onSend, enabled = text.isNotBlank(), modifier = Modifier.size(36.dp)) {
+            // Send button
+            IconButton(
+                onClick = onSend,
+                enabled = text.isNotBlank(),
+                modifier = Modifier.size(36.dp)
+            ) {
                 Text(
-                    ">", style = MaterialTheme.typography.titleLarge,
+                    text = ">",
+                    style = MaterialTheme.typography.titleLarge,
                     color = if (text.isNotBlank()) CommandCursor else TextMuted,
                     fontWeight = FontWeight.Bold
                 )
@@ -241,11 +387,29 @@ private fun CommandInputBar(
     }
 }
 
+// ── Utility ──
+
 private fun formatTimestamp(epoch: Long): String {
-    val diff = (System.currentTimeMillis() / 1000) - epoch
+    val now = System.currentTimeMillis() / 1000
+    val diff = now - epoch
     return when {
-        diff < 60 -> "now"
+        diff < 60 -> "${diff}s ago"
         diff < 3600 -> "${diff / 60}m ago"
-        else -> "${diff / 3600}h ago"
+        diff < 86400 -> "${diff / 3600}h ago"
+        else -> "${diff / 86400}d ago"
     }
 }
+
+// Simple border drawing — in production use Modifier.border()
+@Composable
+private fun Modifier.drawWithBorder(color: androidx.compose.ui.graphics.Color, shape: RoundedCornerShape): Modifier =
+    this.then(
+        Modifier.drawWithContent {
+            drawContent()
+            drawRoundRect(
+                color = color,
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx()),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+            )
+        }
+    )

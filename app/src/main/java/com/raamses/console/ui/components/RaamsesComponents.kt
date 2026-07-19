@@ -30,8 +30,8 @@ fun StatusIndicator(status: String, modifier: Modifier = Modifier) {
         if (pulse) {
             val alpha = remember { androidx.compose.animation.core.Animatable(1f) }
             LaunchedEffect(Unit) {
-                androidx.compose.animation.core.animate(
-                    alpha, 0.3f,
+                alpha.animateTo(
+                    targetValue = 0.3f,
                     animationSpec = androidx.compose.animation.core.infiniteRepeatable(
                         animation = androidx.compose.animation.core.tween(500),
                         repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
