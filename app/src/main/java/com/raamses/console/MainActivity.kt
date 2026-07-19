@@ -17,7 +17,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             RaamsesTheme {
                 RaamsesNavHost(
-                    mockProvider = app.mockProvider
+                    mockProvider = app.mockProvider,
+                    gatewayClient = app.gatewayClient
                 )
             }
         }

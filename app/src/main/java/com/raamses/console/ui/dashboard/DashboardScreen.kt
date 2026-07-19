@@ -1,7 +1,6 @@
 package com.raamses.console.ui.dashboard
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,124 +20,228 @@ fun DashboardScreen(
     agents: List<AgentStatus>,
     serverHealth: ServerHealth,
     alerts: List<ConsoleAlert>,
+    connectionState: ConnectionState,
     onAgentClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val flaggedAgents = agents.filter { it.verification?.flaggedAs != null }
+
     LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Background),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = modifier.fillMaxSize().background(Background),
+        contentPadding = PaddingValues(bottom = 72.dp)
     ) {
-        // ── Header ──
+        // ── Status Bar (htop header) ──
         item {
-            Text(
-                text = "RAAMSES CONSOLE",
-                style = MaterialTheme.typography.headlineMedium,
-                color = AccentBlue,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = "Agent Operations Dashboard",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
-            )
+            HtopStatusBar(serverHealth, flaggedAgents.size, connectionState)
         }
 
-        // ── System Status Bar ──
+        // ── Connection bar ──
         item {
-            SystemStatusBar(serverHealth)
+            ConnectionMiniBar(connectionState)
         }
 
-        // ── Agent Cards ──
-        item {
-            Text(
-                text = "AGENTS (${agents.size})",
-                style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+        // ── Flagged agents alerts ──
+        if (flaggedAgents.isNotEmpty()) {
+            item {
+                FlaggedAgentsBar(flaggedAgents)
+            }
         }
 
-        items(agents, key = { it.agentId }) { agent ->
-            AgentStatusCard(
-                agent = agent,
-                onClick = { onAgentClick(agent.agentId) }
-            )
-        }
-
-        // ── Active Alerts ──
-        if (alerts.isNotEmpty()) {
+        // ── Verification alerts from gateway ──
+        val verificationAlerts = alerts.filter { it.category == "verification" }
+        if (verificationAlerts.isNotEmpty()) {
             item {
                 Text(
-                    text = "ALERTS (${alerts.size})",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(top = 8.dp)
+                    "VERIFICATION ALERTS",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = SeverityWarning,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 )
             }
-            items(alerts.take(3), key = { it.id }) { alert ->
-                AlertCard(alert = alert)
+            items(verificationAlerts, key = { it.id }) { alert ->
+                AlertCard(alert = alert, modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp))
             }
         }
 
-        // ── Spacer for nav bar ──
-        item { Spacer(Modifier.height(72.dp)) }
+        // ── Agent list header ──
+        item {
+            HtopColumnHeaders()
+        }
+
+        // ── Agent rows ──
+        items(agents, key = { it.agentId }) { agent ->
+            AgentRow(agent = agent, onClick = { onAgentClick(agent.agentId) })
+            HorizontalDivider(color = Border, thickness = 0.5.dp)
+        }
+
+        // ── Recent events ──
+        item {
+            Text(
+                "RECENT EVENTS",
+                style = MaterialTheme.typography.labelMedium,
+                color = TextMuted,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
+        val allEvents = agents.flatMap { it.recentActivity }.sortedByDescending { it.timestampSec }.take(10)
+        items(allEvents) { event ->
+            ActivityFeedItem(event = event, modifier = Modifier.padding(horizontal = 12.dp))
+        }
     }
 }
 
 @Composable
-private fun SystemStatusBar(health: ServerHealth) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface)
+private fun HtopStatusBar(
+    health: ServerHealth,
+    flaggedCount: Int,
+    connection: ConnectionState
+) {
+    Surface(color = Surface, shadowElevation = 2.dp) {
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+            // Top row: title + overall status
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("RAAMSES CONSOLE", style = MaterialTheme.typography.titleMedium, color = AccentBlue, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = health.overallStatus.uppercase(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = when (health.overallStatus) {
+                            "green" -> StatusActive
+                            "yellow" -> SeverityWarning
+                            else -> SeverityCritical
+                        }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Metrics bar
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                MetricBadge("CPU", "${(health.cpuPercent * 100).toInt()}%", barColor(health.cpuPercent))
+                MetricBadge("MEM", "${(health.memoryPercent * 100).toInt()}%", barColor(health.memoryPercent))
+                MetricBadge("DISK", "${(health.diskPercent * 100).toInt()}%", barColor(health.diskPercent))
+                MetricBadge("UP", health.uptimeDisplay, TextSecondary)
+            }
+
+            Spacer(Modifier.height(6.dp))
+
+            // Agent counts
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                CountBadge("AGENTS", health.agentCount, TextPrimary)
+                CountBadge("ACTIVE", health.activeAgentCount, StatusActive)
+                CountBadge("BLOCKED", health.blockedAgentCount, StatusBlocked)
+                CountBadge("FLAGGED", flaggedCount, if (flaggedCount > 0) SeverityCritical else TextMuted)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetricBadge(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = color, fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = TextMuted)
+    }
+}
+
+@Composable
+private fun CountBadge(label: String, count: Int, color: androidx.compose.ui.graphics.Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("$count", style = MaterialTheme.typography.bodyMedium, color = color, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.width(4.dp))
+        Text(label, style = MaterialTheme.typography.bodySmall, color = TextMuted)
+    }
+}
+
+@Composable
+private fun ConnectionMiniBar(state: ConnectionState) {
+    if (!state.connected) {
+        Surface(color = SurfaceVariant, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                "DISCONNECTED — using mock data  |  /connect <host:port> to connect",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMuted,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
+        }
+    } else {
+        Surface(color = StatusActive.copy(alpha = 0.08f), modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("CONNECTED: ${state.host}:${state.port}", style = MaterialTheme.typography.bodySmall, color = StatusActive)
+                Text("${state.tier.uppercase()} TIER", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FlaggedAgentsBar(flagged: List<AgentStatus>) {
+    Surface(color = SeverityCritical.copy(alpha = 0.1f), modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                "⚠ ${flagged.size} AGENT${if (flagged.size > 1) "S" else ""} FLAGGED",
+                style = MaterialTheme.typography.labelMedium,
+                color = SeverityCritical,
+                fontWeight = FontWeight.Bold
+            )
+            flagged.forEach { agent ->
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        when (agent.verification?.flaggedAs) {
+                            "hallucinating" -> "💀"
+                            "looping" -> "🔁"
+                            else -> "⚠"
+                        },
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "${agent.name}: ${agent.verification?.recommendation ?: "Review required"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HtopColumnHeaders() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Surface)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            StatusChip("CPU", "${(health.cpuPercent * 100).toInt()}%", if (health.cpuPercent > 0.8f) SeverityWarning else AccentGreen)
-            StatusChip("MEM", "${(health.memoryPercent * 100).toInt()}%", if (health.memoryPercent > 0.8f) SeverityWarning else AccentGreen)
-            StatusChip("DISK", "${(health.diskPercent * 100).toInt()}%", if (health.diskPercent > 0.85f) SeverityWarning else AccentGreen)
-            StatusChip("UP", formatUptime(health.uptimeSeconds), TextSecondary)
-        }
-        Divider(color = Border, thickness = 0.5.dp)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            StatItem("AGENTS", "${health.agentCount}")
-            StatItem("ACTIVE", "${health.activeAgentCount}", StatusActive)
-            StatItem("BLOCKED", "${health.blockedAgentCount}", if (health.blockedAgentCount > 0) StatusBlocked else TextMuted)
-        }
+        Text("STATUS", style = MaterialTheme.typography.bodySmall, color = TextMuted, modifier = Modifier.width(72.dp))
+        Text("AGENT", style = MaterialTheme.typography.bodySmall, color = TextMuted, modifier = Modifier.weight(1f))
+        Text("HOME", style = MaterialTheme.typography.bodySmall, color = TextMuted, modifier = Modifier.width(80.dp))
+        Text("PROG", style = MaterialTheme.typography.bodySmall, color = TextMuted, modifier = Modifier.width(60.dp))
+        Text("TOKENS", style = MaterialTheme.typography.bodySmall, color = TextMuted, modifier = Modifier.width(50.dp))
     }
 }
 
-@Composable
-private fun StatusChip(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = value, style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.Bold)
-        Text(text = label, style = MaterialTheme.typography.bodySmall, color = TextMuted)
-    }
-}
-
-@Composable
-private fun StatItem(label: String, value: String, color: androidx.compose.ui.graphics.Color = TextPrimary) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = value, style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.Bold)
-        Text(text = label, style = MaterialTheme.typography.bodySmall, color = TextMuted)
-    }
-}
-
-private fun formatUptime(seconds: Long): String = when {
-    seconds >= 86400 -> "${seconds / 86400}d"
-    seconds >= 3600 -> "${seconds / 3600}h"
-    else -> "${seconds / 60}m"
+private fun barColor(fraction: Float): androidx.compose.ui.graphics.Color = when {
+    fraction > 0.85f -> SeverityCritical
+    fraction > 0.7f -> SeverityWarning
+    else -> StatusActive
 }
