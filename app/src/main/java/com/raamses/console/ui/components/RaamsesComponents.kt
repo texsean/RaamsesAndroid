@@ -2,41 +2,56 @@ package com.raamses.console.ui.components
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.raamses.console.data.models.AgentStatus
+import com.raamses.console.data.models.*
 import com.raamses.console.ui.theme.*
+
+// ═══════════════════════════════════════════════
+// Status Indicator — color-coded agent state
+// ═══════════════════════════════════════════════
 
 @Composable
 fun StatusIndicator(status: String, modifier: Modifier = Modifier) {
-    val color = when (status) {
-        "ACTIVE" -> StatusActive
-        "QUIET" -> StatusQuiet
-        "IDLE" -> StatusIdle
-        "STALE" -> StatusStale
-        "BLOCKED" -> StatusBlocked
-        "UNVERIFIED" -> StatusUnverified
-        else -> TextMuted
-    }
+    val color = statusColor(status)
+    val pulse = status == "HALLUCINATING" || status == "LOOPING"
 
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(color)
-        )
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        if (pulse) {
+            val alpha = remember { androidx.compose.animation.core.Animatable(1f) }
+            LaunchedEffect(Unit) {
+                androidx.compose.animation.core.animate(
+                    alpha, 0.3f,
+                    animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                        animation = androidx.compose.animation.core.tween(500),
+                        repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                    )
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = alpha.value))
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(color)
+            )
+        }
         Spacer(Modifier.width(6.dp))
         Text(
             text = status,
@@ -47,295 +62,217 @@ fun StatusIndicator(status: String, modifier: Modifier = Modifier) {
     }
 }
 
+fun statusColor(status: String): Color = when (status) {
+    "ACTIVE" -> StatusActive
+    "QUIET" -> StatusQuiet
+    "IDLE" -> StatusIdle
+    "STALE" -> StatusStale
+    "BLOCKED" -> StatusBlocked
+    "UNVERIFIED" -> StatusUnverified
+    "HALLUCINATING" -> SeverityCritical
+    "LOOPING" -> AccentOrange
+    else -> TextMuted
+}
+
+// ═══════════════════════════════════════════════
+// Verifier Badge — shows verification result
+// ═══════════════════════════════════════════════
+
 @Composable
-fun AgentStatusCard(
+fun VerifierBadge(verification: VerificationInfo?, modifier: Modifier = Modifier) {
+    if (verification == null) return
+
+    val (bgColor, text) = when {
+        verification.flaggedAs == "hallucinating" -> SeverityCritical.copy(alpha = 0.2f) to "💀 HALLUCINATING"
+        verification.flaggedAs == "looping" -> AccentOrange.copy(alpha = 0.2f) to "🔁 LOOPING"
+        !verification.verified -> SeverityWarning.copy(alpha = 0.15f) to "⚠ UNVERIFIED"
+        verification.confidence > 0.8f -> StatusActive.copy(alpha = 0.15f) to "✓ VERIFIED ${(verification.confidence * 100).toInt()}%"
+        else -> StatusQuiet.copy(alpha = 0.15f) to "~ VERIFIED ${(verification.confidence * 100).toInt()}%"
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(4.dp),
+        color = bgColor
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Text(text, style = MaterialTheme.typography.labelMedium, color = statusColor(verification.flaggedAs ?: "ACTIVE"))
+            if (verification.issues.isNotEmpty()) {
+                verification.issues.take(2).forEach { issue ->
+                    Text("  • $issue", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                }
+            }
+            verification.recommendation?.let {
+                Text("  → $it", style = MaterialTheme.typography.bodySmall, color = AccentBlue)
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════
+// Agent Row (htop-style compact)
+// ═══════════════════════════════════════════════
+
+@Composable
+fun AgentRow(
     agent: AgentStatus,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground)
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = if (agent.verification?.flaggedAs != null)
+            statusColor(agent.verification.flaggedAs!!).copy(alpha = 0.05f)
+        else CardBackground,
+        shape = RoundedCornerShape(0.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(16.dp)
+                .clickable { onClick() }
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = agent.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = agent.agentId,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMuted
-                    )
+            // Status dot
+            StatusIndicator(agent.status, modifier = Modifier.width(72.dp))
+
+            // Agent name + objective
+            Column(modifier = Modifier.weight(1f)) {
+                Text(agent.name, style = MaterialTheme.typography.bodyMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
+                agent.objective?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = TextMuted, maxLines = 1)
                 }
-                StatusIndicator(agent.status)
             }
 
-            if (agent.currentOperation != null) {
-                Spacer(Modifier.height(8.dp))
+            // Home dir (truncated)
+            agent.homeDirectory?.let {
                 Text(
-                    text = agent.currentOperation,
+                    text = it.split("/").takeLast(2).joinToString("/"),
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
+                    color = TextMuted,
+                    modifier = Modifier.width(80.dp),
                     maxLines = 1
                 )
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.width(8.dp))
 
-            // Last verified work
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            // Progress
+            Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(60.dp)) {
                 Text(
-                    text = "LAST VERIFIED: ${agent.lastVerifiedDescription ?: "N/A"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextMuted,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f)
+                    "${(agent.verifiedCompletion * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (agent.verifiedCompletion < agent.reportedCompletion) SeverityWarning else StatusActive
                 )
-                agent.lastVerifiedWorkSecAgo?.let {
-                    Text(
-                        text = formatSecondsAgo(it),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = StatusActive
-                    )
-                }
+                LinearProgressIndicator(
+                    progress = { agent.verifiedCompletion },
+                    modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
+                    color = if (agent.verifiedCompletion < agent.reportedCompletion) SeverityWarning else StatusActive,
+                    trackColor = SurfaceVariant
+                )
             }
 
-            // Progress bar (verified vs reported)
-            if (agent.verifiedCompletion > 0 || agent.reportedCompletion > 0) {
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "${(agent.verifiedCompletion * 100).toInt()}% verified",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = StatusActive,
-                        modifier = Modifier.width(80.dp)
-                    )
-                    LinearProgressIndicator(
-                        progress = { agent.verifiedCompletion },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp)),
-                        color = StatusActive,
-                        trackColor = SurfaceVariant
-                    )
-                }
-                if (agent.reportedCompletion != agent.verifiedCompletion) {
-                    Spacer(Modifier.height(2.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "${(agent.reportedCompletion * 100).toInt()}% reported",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = SeverityWarning,
-                            modifier = Modifier.width(80.dp)
-                        )
-                        Text(
-                            text = "⚠ MISMATCH",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = SeverityWarning,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
+            Spacer(Modifier.width(8.dp))
 
-            // Token usage
+            // Tokens today
             agent.tokenUsage?.let { tokens ->
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    TokenBadge("TODAY", tokens.today)
-                    TokenBadge("1HR", tokens.lastHour)
-                    TokenBadge("TOTAL", tokens.total)
+                Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(50.dp)) {
+                    Text(formatTokenCount(tokens.today), style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                    Text("tokens", style = MaterialTheme.typography.bodySmall, color = TextMuted)
                 }
             }
 
-            // Needs input badge
-            if (agent.needsHumanInput) {
-                Spacer(Modifier.height(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = StatusBlocked.copy(alpha = 0.2f)
-                ) {
-                    Text(
-                        text = "NEEDS HUMAN INPUT",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = StatusBlocked,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
+            // Verifier flag
+            if (agent.verification?.flaggedAs != null) {
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = when (agent.verification.flaggedAs) {
+                        "hallucinating" -> "💀"
+                        "looping" -> "🔁"
+                        else -> "⚠"
+                    },
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }
 }
 
-@Composable
-fun TokenBadge(label: String, value: Long) {
-    Column {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = TextMuted
-        )
-        Text(
-            text = formatTokenCount(value),
-            style = MaterialTheme.typography.labelMedium,
-            color = TextSecondary
-        )
-    }
-}
+// ═══════════════════════════════════════════════
+// Activity Feed Item
+// ═══════════════════════════════════════════════
 
 @Composable
-fun WorkPulseGraph(
-    pulse: List<Int>,
-    modifier: Modifier = Modifier,
-    barColor: androidx.compose.ui.graphics.Color = AccentGreen
-) {
-    if (pulse.isEmpty()) return
-
-    val maxVal = pulse.max().coerceAtLeast(1)
-
+fun ActivityFeedItem(event: ActivityEvent, modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(32.dp),
-        horizontalArrangement = Arrangement.spacedBy(1.dp),
-        verticalAlignment = Alignment.Bottom
-    ) {
-        pulse.forEach { value ->
-            val heightFraction = value.toFloat() / maxVal
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(heightFraction.coerceIn(0.05f, 1f))
-                    .clip(RoundedCornerShape(1.dp))
-                    .background(if (value > 0) barColor else SurfaceVariant)
-            )
-        }
-    }
-}
-
-@Composable
-fun ActivityFeedItem(
-    event: com.raamses.console.data.models.ActivityEvent,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = formatTimestamp(event.timestamp),
+            text = formatSecondsAgo(event.timestampSec),
             style = MaterialTheme.typography.bodySmall,
             color = TextMuted,
-            modifier = Modifier.width(60.dp)
+            modifier = Modifier.width(48.dp)
         )
         Text(
-            text = event.type.name.replace("_", " "),
+            text = event.type.symbol,
             style = MaterialTheme.typography.labelMedium,
-            color = when (event.type) {
-                com.raamses.console.data.models.ActivityType.FILE_WRITE -> AccentGreen
-                com.raamses.console.data.models.ActivityType.TEST -> AccentBlue
-                com.raamses.console.data.models.ActivityType.COMPILER -> AccentOrange
-                com.raamses.console.data.models.ActivityType.USER_INPUT -> StatusBlocked
-                com.raamses.console.data.models.ActivityType.VERIFICATION -> SeverityWarning
-                com.raamses.console.data.models.ActivityType.COMMIT -> StatusActive
-                else -> TextSecondary
-            },
-            modifier = Modifier.width(72.dp)
+            color = activityColor(event.type),
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(16.dp)
         )
         Text(
             text = event.description,
             style = MaterialTheme.typography.bodySmall,
             color = TextPrimary,
-            maxLines = 1
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
         )
-        if (event.detail != null) {
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = event.detail,
-                style = MaterialTheme.typography.bodySmall,
-                color = TextMuted,
-                maxLines = 1
-            )
+        event.detail?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = TextMuted, maxLines = 1)
         }
     }
 }
 
+fun activityColor(type: ActivityType): Color = when (type) {
+    ActivityType.FILE_WRITE -> AccentGreen
+    ActivityType.TEST -> AccentBlue
+    ActivityType.COMPILER -> AccentOrange
+    ActivityType.USER_INPUT -> StatusBlocked
+    ActivityType.VERIFICATION -> SeverityWarning
+    ActivityType.COMMIT -> StatusActive
+    else -> TextSecondary
+}
+
+// ═══════════════════════════════════════════════
+// Alert Card
+// ═══════════════════════════════════════════════
+
 @Composable
-fun AlertCard(
-    alert: com.raamses.console.data.models.ConsoleAlert,
-    onAck: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
-) {
+fun AlertCard(alert: ConsoleAlert, onAck: (() -> Unit)? = null, modifier: Modifier = Modifier) {
     val severityColor = when (alert.severity) {
         "critical" -> SeverityCritical
         "warning" -> SeverityWarning
         else -> SeverityInfo
     }
-
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = severityColor.copy(alpha = 0.1f))
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.Top
-        ) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
             Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .height(40.dp)
+                modifier = Modifier.width(3.dp).height(40.dp)
                     .clip(RoundedCornerShape(2.dp))
                     .background(severityColor)
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = alert.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = formatSecondsAgo(alert.timestamp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMuted
-                    )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(alert.title, style = MaterialTheme.typography.titleMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
+                    Text(formatSecondsAgo(alert.timestampSec), style = MaterialTheme.typography.bodySmall, color = TextMuted)
                 }
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    text = alert.message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
-                )
+                Text(alert.message, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 if (alert.requiresAck && !alert.acknowledged && onAck != null) {
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = onAck) {
@@ -347,7 +284,9 @@ fun AlertCard(
     }
 }
 
-// ── Utility Formatters ──
+// ═══════════════════════════════════════════════
+// Utility
+// ═══════════════════════════════════════════════
 
 fun formatSecondsAgo(epoch: Long): String {
     val diff = (System.currentTimeMillis() / 1000) - epoch
@@ -359,22 +298,8 @@ fun formatSecondsAgo(epoch: Long): String {
     }
 }
 
-fun formatTimestamp(epoch: Long): String {
-    val diff = (System.currentTimeMillis() / 1000) - epoch
-    return when {
-        diff < 60 -> "now"
-        diff < 3600 -> "${diff / 60}m ago"
-        else -> "${diff / 3600}h ago"
-    }
-}
-
 fun formatTokenCount(count: Long): String = when {
     count >= 1_000_000 -> "${count / 1_000_000}.${(count % 1_000_000) / 100_000}M"
     count >= 1_000 -> "${count / 1_000}.${(count % 1_000) / 100}K"
     else -> count.toString()
 }
-
-// Local clickable composable helper
-@Composable
-private fun Modifier.clickable(onClick: () -> Unit): Modifier =
-    this.then(androidx.compose.foundation.clickable { onClick() })
