@@ -65,12 +65,6 @@ class MockDataProvider {
             needsHumanInput = false,
             verifiedCompletion = 0.72f,
             reportedCompletion = 0.80f,
-            checklist = listOf(
-                ChecklistItem("Token endpoint", ItemStatus.DONE),
-                ChecklistItem("Refresh flow", ItemStatus.IN_PROGRESS),
-                ChecklistItem("Scope validation", ItemStatus.DONE),
-                ChecklistItem("Error handling", ItemStatus.PENDING)
-            ),
             recentActivity = listOf(
                 ActivityEvent(now - 15, ActivityType.FILE_READ, "auth/mod.rs", null),
                 ActivityEvent(now - 8, ActivityType.FILE_WRITE, "auth/refresh.rs", "+87/-12 lines"),
@@ -84,19 +78,13 @@ class MockDataProvider {
             status = "BLOCKED",
             objective = "Cross-compile ESP32 firmware",
             currentOperation = "Awaiting user: select target board variant",
-            lastVerifiedWork = now - 420,
+            lastVerifiedWorkSecAgo = now - 420,
             lastVerifiedDescription = "cmake: board variant not specified",
             tokenUsage = TokenUsageData(total = 12_400, lastHour = 0, today = 3_100),
             subAgentCount = 0,
             needsHumanInput = true,
             verifiedCompletion = 0.35f,
             reportedCompletion = 0.35f,
-            checklist = listOf(
-                ChecklistItem("Toolchain setup", ItemStatus.DONE),
-                ChecklistItem("Base firmware compile", ItemStatus.DONE),
-                ChecklistItem("Board variant config", ItemStatus.PENDING),
-                ChecklistItem("Flash script", ItemStatus.PENDING)
-            ),
             recentActivity = listOf(
                 ActivityEvent(now - 420, ActivityType.SHELL_CMD, "cmake --preset esp32-s3", "BOARD not set"),
                 ActivityEvent(now - 425, ActivityType.USER_INPUT, "Awaiting board selection", null)
@@ -109,19 +97,13 @@ class MockDataProvider {
             status = "QUIET",
             objective = "Market research: agent monitoring tools",
             currentOperation = "Compiling competitor analysis",
-            lastVerifiedWork = now - 180,
+            lastVerifiedWorkSecAgo = now - 180,
             lastVerifiedDescription = "Writing: research/competitors.md",
             tokenUsage = TokenUsageData(total = 56_200, lastHour = 2_100, today = 18_500),
             subAgentCount = 0,
             needsHumanInput = false,
             verifiedCompletion = 0.65f,
             reportedCompletion = 0.70f,
-            checklist = listOf(
-                ChecklistItem("Competitor landscape", ItemStatus.DONE),
-                ChecklistItem("Pricing analysis", ItemStatus.DONE),
-                ChecklistItem("Feature matrix", ItemStatus.IN_PROGRESS),
-                ChecklistItem("SWOT analysis", ItemStatus.PENDING)
-            ),
             recentActivity = listOf(
                 ActivityEvent(now - 180, ActivityType.FILE_WRITE, "research/competitors.md", "+156/-23 lines")
             ),
@@ -135,7 +117,7 @@ class MockDataProvider {
             severity = "critical",
             title = "Agent Blocked",
             message = "Pi Build Agent awaiting board variant selection for 7 minutes",
-            timestamp = now - 420,
+            timestampSec = now - 420,
             requiresAck = true
         ),
         ConsoleAlert(
