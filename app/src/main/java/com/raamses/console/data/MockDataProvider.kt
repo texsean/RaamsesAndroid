@@ -36,21 +36,13 @@ class MockDataProvider {
             status = "ACTIVE",
             objective = "Implement Debian gateway registration",
             currentOperation = "Debugging failed TLS handshake test",
-            lastVerifiedWork = now - 12,
+            lastVerifiedWorkSecAgo = now - 12,
             lastVerifiedDescription = "Editing: gateway.cpp — clang++ build running",
             tokenUsage = TokenUsageData(total = 142_300, lastHour = 8_200, today = 47_800),
             subAgentCount = 2,
             needsHumanInput = false,
             verifiedCompletion = 0.48f,
             reportedCompletion = 0.85f,
-            checklist = listOf(
-                ChecklistItem("Configuration loader", ItemStatus.DONE),
-                ChecklistItem("HTTP listener", ItemStatus.DONE),
-                ChecklistItem("Console registration", ItemStatus.IN_PROGRESS),
-                ChecklistItem("Heartbeat handling", ItemStatus.IN_PROGRESS),
-                ChecklistItem("TLS validation", ItemStatus.PENDING),
-                ChecklistItem("systemd installer", ItemStatus.PENDING)
-            ),
             recentActivity = listOf(
                 ActivityEvent(now - 23, ActivityType.FILE_READ, "protocol.xsd", null),
                 ActivityEvent(now - 18, ActivityType.FILE_WRITE, "gateway.cpp", "+412/-96 lines"),
@@ -168,9 +160,11 @@ class MockDataProvider {
         cpuPercent = 0.61f,
         memoryPercent = 0.43f,
         diskPercent = 0.28f,
-        uptimeSeconds = 86400 * 3 + 14400,
+        uptimeDisplay = "3d 4h 12m",
         agentCount = 4,
         activeAgentCount = 2,
-        blockedAgentCount = 1
+        blockedAgentCount = 1,
+        flaggedAgentCount = 0,
+        overallStatus = "yellow"
     )
 }
