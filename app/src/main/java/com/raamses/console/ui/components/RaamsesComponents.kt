@@ -257,9 +257,11 @@ fun ActivityFeedItem(
             style = MaterialTheme.typography.labelMedium,
             color = when (event.type) {
                 com.raamses.console.data.models.ActivityType.FILE_WRITE -> AccentGreen
-                com.raamses.console.data.models.ActivityType.TEST_EXEC -> AccentBlue
-                com.raamses.console.data.models.ActivityType.COMPILER_RUN -> AccentOrange
+                com.raamses.console.data.models.ActivityType.TEST -> AccentBlue
+                com.raamses.console.data.models.ActivityType.COMPILER -> AccentOrange
                 com.raamses.console.data.models.ActivityType.USER_INPUT -> StatusBlocked
+                com.raamses.console.data.models.ActivityType.VERIFICATION -> SeverityWarning
+                com.raamses.console.data.models.ActivityType.COMMIT -> StatusActive
                 else -> TextSecondary
             },
             modifier = Modifier.width(72.dp)

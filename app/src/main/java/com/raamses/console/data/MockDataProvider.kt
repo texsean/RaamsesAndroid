@@ -54,8 +54,8 @@ class MockDataProvider {
             recentActivity = listOf(
                 ActivityEvent(now - 23, ActivityType.FILE_READ, "protocol.xsd", null),
                 ActivityEvent(now - 18, ActivityType.FILE_WRITE, "gateway.cpp", "+412/-96 lines"),
-                ActivityEvent(now - 14, ActivityType.COMPILER_RUN, "cmake --build", "exit 0"),
-                ActivityEvent(now - 5, ActivityType.TEST_EXEC, "gateway tests", "18 passed, 2 failed"),
+                ActivityEvent(now - 14, ActivityType.COMPILER, "cmake --build", "exit 0"),
+                ActivityEvent(now - 5, ActivityType.TEST, "gateway tests", "18 passed, 2 failed"),
                 ActivityEvent(now - 2, ActivityType.FILE_WRITE, "gateway_tests.cpp", "+34/-2 lines")
             ),
             workPulse = listOf(1,2,3,7,6,5,7,2,1,1,3,6,7,5,3,1, 0,1,2,5,7,6,4,3,2,2,4,6,7,5,4,2, 1,2,3,5,7,6,4,3,2,3,5,7,7,5,3,2, 1,2,4,5,7,6,5,3,2,3,5,7)
@@ -82,7 +82,7 @@ class MockDataProvider {
             recentActivity = listOf(
                 ActivityEvent(now - 15, ActivityType.FILE_READ, "auth/mod.rs", null),
                 ActivityEvent(now - 8, ActivityType.FILE_WRITE, "auth/refresh.rs", "+87/-12 lines"),
-                ActivityEvent(now - 4, ActivityType.COMPILER_RUN, "cargo check", "exit 0")
+                ActivityEvent(now - 4, ActivityType.COMPILER, "cargo check", "exit 0")
             ),
             workPulse = listOf(0,0,1,3,5,4,4,3,2,2,5,6,5,4,2,1, 1,2,3,5,4,3,2,1,2,3,4,5,4,3,2,1, 2,3,4,5,4,3,2,2,3,4,5,4,3,2,1,1, 2,3,4,5,4,3,2,2,3,4,4,3)
         ),
