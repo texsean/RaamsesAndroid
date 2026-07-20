@@ -108,9 +108,9 @@ fun RaamsesNavHost(
                 GatewayScreen(
                     messages = displayMessages,
                     onSendCommand = { cmd -> gatewayClient.sendCommand(cmd) },
-                    connectionState = connectionState,
-                    onConnectClick = { navController.navigate(Screen.Connection.route) },
-                    onDisconnectClick = { gatewayClient.disconnect() }
+                    isConnected = connectionState.connected,
+                    serverHost = connectionState.host,
+                    onConnectClick = { navController.navigate(Screen.Connection.route) }
                 )
             }
 
