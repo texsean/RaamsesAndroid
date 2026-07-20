@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
@@ -172,6 +173,22 @@ private fun WelcomeMessage() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(48.dp))
+        // RAAMSES Icon
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF1A1A18)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "R",
+                style = MaterialTheme.typography.displayMedium,
+                color = Color(0xFFE8E8E0),
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(Modifier.height(16.dp))
         Text(
             text = "RAAMSES GATEWAY",
             style = MaterialTheme.typography.displayLarge,

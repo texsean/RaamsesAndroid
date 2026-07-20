@@ -4,8 +4,24 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:fillColor="#FF448AFF" android:pathData="M36,30 L36,78 L54,78 C64,78 70,72 70,64 C70,58 66,54 60,52 L72,30 L60,30 L50,48 L48,48 L48,30 Z M48,56 L54,56 C60,56 62,60 62,64 C62,68 58,70 54,70 L48,70 Z"/>
-    <path android:fillColor="#FF00E676" android:pathData="M78,72 L78,78 L82,78 L82,72 Z"/>
-    <path android:fillColor="#FF00E676" android:pathData="M84,66 L84,78 L88,78 L88,66 Z"/>
-    <path android:fillColor="#FF00E676" android:pathData="M90,60 L90,78 L94,78 L94,60 Z"/>
+
+    <!-- Terminal cursor underscore -->
+    <path
+        android:fillColor="#FFE8E8E0"
+        android:pathData="M62,76 L78,76 L78,80 L62,80 Z"/>
+
+    <!-- R monogram - crisp ePaper terminal style -->
+    <path
+        android:fillColor="#FFE8E8E0"
+        android:pathData="
+            M36,28 L36,78 L52,78 C62,78 70,72 70,64
+            C70,56 64,52 58,50 L68,28 L54,28 L46,44 L46,28 Z
+            M46,52 L52,52 C58,52 60,56 60,62
+            C60,68 56,70 52,70 L46,70 Z"/>
+
+    <!-- Agent status dots (3 agents) -->
+    <path android:fillColor="#FF00E676" android:pathData="M78,34 A4,4 0,1,1 78,33.99 Z"/>
+    <path android:fillColor="#FF448AFF" android:pathData="M78,46 A4,4 0,1,1 78,45.99 Z"/>
+    <path android:fillColor="#FFFF9100" android:pathData="M78,58 A4,4 0,1,1 78,57.99 Z"/>
+
 </vector>
