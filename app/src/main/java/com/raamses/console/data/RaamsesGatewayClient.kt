@@ -5,7 +5,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.serialization.json.Json
+import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
@@ -25,7 +25,6 @@ import java.util.UUID
  */
 class RaamsesGatewayClient {
 
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true; prettyPrint = false }
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val deviceId = "android-console-${UUID.randomUUID().toString().take(8)}"
 
@@ -167,9 +166,7 @@ class RaamsesGatewayClient {
                 conn.connectTimeout = 5000
                 conn.readTimeout = 5000
 
-                val registerPayload = json.encodeToString(
-                    RegisterMessage.serializer(),
-                    RegisterMessage(
+                val registerPayload = RegisterMessage(
                         device_id = deviceId,
                         device_type = "android_console",
                         device_name = "RAAMSES Android Console",
@@ -179,8 +176,7 @@ class RaamsesGatewayClient {
                             output = OutputCapability(has_vibration = true),
                             power = PowerCapability(has_battery = true)
                         )
-                    )
-                )
+                    ).toJson().toString()
 
                 OutputStreamWriter(conn.outputStream).use { it.write(registerPayload) }
                 conn.connect()
@@ -224,10 +220,10 @@ class RaamsesGatewayClient {
                 timestamp = java.time.Instant.now().toString(),
                 device_id = deviceId
             ),
-            payload = json.encodeToString(RegisterMessage.serializer(), register),
+            payload = register.toJson().toString(),
             content_type = "application/json"
         )
-        writer.write(json.encodeToString(RaamsesEnvelope.serializer(), envelope) + "\n")
+        writer.write(envelope.toJson().toString() + "\n")
         writer.flush()
 
         // Read ack
@@ -263,7 +259,7 @@ class RaamsesGatewayClient {
                         "status" to "online"
                     )
                     OutputStreamWriter(conn.outputStream).use {
-                        it.write(json.encodeToString(MapSerializer, heartbeat))
+                        it.write(JSONObject(heartbeat).toString())
                     }
                     conn.connect()
                     conn.disconnect()
@@ -322,7 +318,7 @@ class RaamsesGatewayClient {
                     "markdown" to command
                 )
                 OutputStreamWriter(conn.outputStream).use {
-                    it.write(json.encodeToString(MapSerializer, cmdPayload))
+                    it.write(JSONObject(cmdPayload).toString())
                 }
 
                 if (conn.responseCode == 200) {
@@ -378,14 +374,14 @@ class RaamsesGatewayClient {
     private fun parseMessage(raw: String) {
         try {
             // Try JSON envelope
-            val envelope = json.decodeFromString(RaamsesEnvelope.serializer(), raw)
+            val envelope = RaamsesEnvelope.fromJson(JSONObject(raw))
             when {
                 raw.contains("agent_update") || raw.contains("agent_id") -> {
-                    val update = json.decodeFromString(AgentUpdate.serializer(), envelope.payload)
+                    val update = AgentUpdate.fromJson(JSONObject(envelope.payload))
                     updateAgentState(update)
                 }
                 raw.contains("\"severity\"") -> {
-                    val alert = json.decodeFromString(Alert.serializer(), envelope.payload)
+                    val alert = Alert.fromJson(JSONObject(envelope.payload))
                     _alerts.value = _alerts.value + ConsoleAlert(
                         id = envelope.header.message_id,
                         severity = alert.severity,
@@ -410,7 +406,7 @@ class RaamsesGatewayClient {
     }
 
     private fun parseServerStatus(body: String) {
-        val status = json.decodeFromString(ServerStatus.serializer(), body)
+        val status = ServerStatus.fromJson(JSONObject(body))
         _serverHealth.value = ServerHealth(
             cpuPercent = status.cpu_usage.removeSuffix("%").toFloatOrNull()?.div(100) ?: 0f,
             memoryPercent = status.memory_usage.removeSuffix("%").toFloatOrNull()?.div(100) ?: 0f,
@@ -425,7 +421,7 @@ class RaamsesGatewayClient {
 
     private fun parseRegisterAck(body: String) {
         try {
-            val ack = json.decodeFromString(RegisterAck.serializer(), body)
+            val ack = RegisterAck.fromJson(JSONObject(body))
             if (ack.accepted && ack.assigned_profile != null) {
                 _connectionState.value = _connectionState.value.copy(
                     tier = ack.assigned_profile.tier,

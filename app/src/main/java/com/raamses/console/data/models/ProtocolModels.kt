@@ -413,6 +413,27 @@ data class GatewayConnection(
     val reconnect_delay_ms: Long = 5000
 )
 
+// ── Raamses Envelope ──
+
+data class RaamsesEnvelope(
+    val header: RaamsesHeader,
+    val payload: String,
+    val content_type: String = "application/json"
+) {
+    fun toJson() = JSONObject().apply {
+        put("header", header.toJson())
+        put("payload", payload)
+        put("content_type", content_type)
+    }
+    companion object {
+        fun fromJson(json: JSONObject) = RaamsesEnvelope(
+            header = RaamsesHeader.fromJson(json.getJSONObject("header")),
+            payload = json.getString("payload"),
+            content_type = json.optString("content_type", "application/json")
+        )
+    }
+}
+
 // ── Simple message helpers ──
 
 fun jsonToMap(json: JSONObject): Map<String, String> {
