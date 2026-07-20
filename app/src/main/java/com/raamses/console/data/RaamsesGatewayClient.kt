@@ -520,15 +520,3 @@ class RaamsesGatewayClient {
         }
     }
 }
-
-// Helper serializer for Map<String, String> — used in heartbeat/command
-private object MapSerializer : kotlinx.serialization.KSerializer<Map<String, String>> {
-    override val descriptor = kotlinx.serialization.descriptors.buildClassSerialDescriptor("Map")
-    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: Map<String, String>) {
-        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
-        jsonEncoder.encodeJsonElement(kotlinx.serialization.json.buildJsonObject {
-            value.forEach { (k, v) -> put(k, kotlinx.serialization.json.JsonPrimitive(v)) }
-        })
-    }
-    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): Map<String, String> = emptyMap()
-}

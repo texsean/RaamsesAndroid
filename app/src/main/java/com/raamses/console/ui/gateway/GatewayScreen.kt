@@ -2,6 +2,7 @@ package com.raamses.console.ui.gateway
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +24,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.raamses.console.data.models.GatewayMessage
 import com.raamses.console.ui.theme.*
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -95,7 +97,7 @@ fun GatewayScreen(
                 SlashCommandOverlay(
                     filter = slashFilter,
                     onSelect = { cmd ->
-                        inputText = cmd.command + " "
+                        inputText = cmd + " "
                         showSlashMenu = false
                         focusRequester.requestFocus()
                     },
@@ -229,15 +231,13 @@ private fun GatewayMessageBubble(msg: GatewayMessage) {
                 .widthIn(max = 340.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(bgColor)
-                .then(
-                    Modifier.drawWithBorder(borderColor, RoundedCornerShape(12.dp))
-                )
+                .border(1.dp, borderColor, RoundedCornerShape(12.dp))
                 .padding(12.dp)
         ) {
             Column {
                 if (msg.command != null) {
                     Text(
-                        text = msg.command.command,
+                        text = msg.command,
                         style = MaterialTheme.typography.labelMedium,
                         color = SlashHighlight,
                         fontWeight = FontWeight.Bold
@@ -251,7 +251,7 @@ private fun GatewayMessageBubble(msg: GatewayMessage) {
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = formatTimestamp(msg.timestamp),
+                    text = formatTimestamp(msg.timestampSec),
                     style = MaterialTheme.typography.bodySmall,
                     color = TextMuted
                 )
@@ -263,17 +263,29 @@ private fun GatewayMessageBubble(msg: GatewayMessage) {
 @Composable
 private fun SlashCommandOverlay(
     filter: String,
-    onSelect: (SlashCommand) -> Unit,
+    onSelect: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val filtered = SlashCommand.entries.filter {
-        it.command.contains(filter, ignoreCase = true) ||
-        it.description.contains(filter, ignoreCase = true)
+    val allCommands = listOf(
+        "/agents" to "List all agents",
+        "/status" to "System health",
+        "/alerts" to "Active alerts",
+        "/help" to "Show help",
+        "/approve" to "Approve pending action",
+        "/reject" to "Reject pending action",
+        "/pause" to "Pause an agent",
+        "/resume" to "Resume an agent",
+        "/stop" to "Stop an agent",
+        "/restart" to "Restart an agent",
+        "/tokens" to "Token usage",
+        "/cmd" to "Raw command to agent",
+        "/tell" to "Send message to agent",
+        "/ask" to "Ask agent a question"
+    )
+    val filtered = allCommands.filter { (cmd, desc) ->
+        cmd.contains(filter, ignoreCase = true) || desc.contains(filter, ignoreCase = true)
     }
-
     if (filtered.isEmpty()) return
-
-    val grouped = filtered.groupBy { it.category }
 
     Surface(
         modifier = Modifier
@@ -284,34 +296,26 @@ private fun SlashCommandOverlay(
         shadowElevation = 8.dp
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
-            grouped.forEach { (category, commands) ->
-                Text(
-                    text = category.label.uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = TextMuted,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-                commands.forEach { cmd ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(cmd) }
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = cmd.command,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = SlashHighlight,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.width(100.dp)
-                        )
-                        Text(
-                            text = cmd.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
-                    }
+            filtered.forEach { (cmd, desc) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelect(cmd) }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = cmd,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = SlashHighlight,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(100.dp)
+                    )
+                    Text(
+                        text = desc,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
                 }
             }
         }
@@ -399,17 +403,3 @@ private fun formatTimestamp(epoch: Long): String {
         else -> "${diff / 86400}d ago"
     }
 }
-
-// Simple border drawing — in production use Modifier.border()
-@Composable
-private fun Modifier.drawWithBorder(color: androidx.compose.ui.graphics.Color, shape: RoundedCornerShape): Modifier =
-    this.then(
-        Modifier.drawWithContent {
-            drawContent()
-            drawRoundRect(
-                color = color,
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx()),
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
-            )
-        }
-    )
