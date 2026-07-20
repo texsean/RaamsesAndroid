@@ -46,6 +46,7 @@ fun RaamsesNavHost(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val now = System.currentTimeMillis() / 1000
 
     // Collect state
     val agents by gatewayClient.agents.collectAsState()
@@ -62,7 +63,13 @@ fun RaamsesNavHost(
     val displayAgents = agents.ifEmpty { mockProvider.agents.value }
     val displayAlerts = alerts.ifEmpty { mockProvider.alerts.value }
     val displayHealth = if (serverHealth.agentCount == 0) mockProvider.serverHealth.value else serverHealth
-    val displayMessages = gatewayMessages
+    val displayMessages = gatewayMessages.ifEmpty {
+        listOf(
+            GatewayMessage("welcome", "RAAMSES Console ready. Connect to a server or use /help for commands.", false, now, null),
+            GatewayMessage("tip1", "Tip: Type /agents to list agents, /status for health, /alerts for active alerts.", false, now - 10, null),
+            GatewayMessage("tip2", "Tip: Use Quick Connect presets to auto-fill connection settings.", false, now - 20, null)
+        )
+    }
 
     val showBottomBar = currentRoute in bottomNavItems.map { it.route }
 
