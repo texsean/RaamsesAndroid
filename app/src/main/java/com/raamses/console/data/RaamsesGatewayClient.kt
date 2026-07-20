@@ -1,5 +1,6 @@
 package com.raamses.console.data
 
+import android.util.Log
 import com.raamses.console.data.models.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,15 +16,8 @@ import java.net.Socket
 import java.net.URL
 import java.util.UUID
 
-/**
- * RAAMSES Gateway Client — connects to Python emulator or C# server.
- * Supports:
- *   - HTTP REST (C# server: /api/status, /api/instructions)
- *   - HTTP stats (stats-server: /stats)
- *   - Raw TCP (Python raamses protocol)
- *   - XML + JSON message encoding
- */
 class RaamsesGatewayClient {
+    companion object { private const val TAG = "RAAMSES" }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val deviceId = "android-console-${UUID.randomUUID().toString().take(8)}"
@@ -57,6 +51,7 @@ class RaamsesGatewayClient {
     fun connect(config: GatewayConnection) {
         disconnect()
         connectionConfig = config
+        Log.d(TAG, "CONNECT → ${config.host}:${config.port} (TLS=${config.use_tls})")
 
         connectionJob = scope.launch {
             try {
@@ -65,29 +60,27 @@ class RaamsesGatewayClient {
                 )
 
                 when {
-                    // Try TCP first (Python raamses protocol)
                     config.port == 42000 || config.api_path.contains("tcp") -> {
+                        Log.d(TAG, "Using TCP mode for port 42000")
                         connectTcp(config)
                     }
-                    // HTTP REST (C# server or stats-server)
                     else -> {
+                        Log.d(TAG, "Using HTTP mode")
                         connectHttp(config)
                     }
                 }
 
+                Log.i(TAG, "CONNECTED ✓ — ${config.host}:${config.port}")
                 _connectionState.value = _connectionState.value.copy(connected = true)
 
-                // Start heartbeat
                 startHeartbeat(config)
-
-                // Start stats polling
                 startStatsPolling(config)
 
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                Log.e(TAG, "CONNECT FAILED ✗ — ${e.javaClass.simpleName}: ${e.message}")
                 _connectionState.value = _connectionState.value.copy(connected = false)
-                // Fall back to mock
                 MockDataProvider().let { mock ->
                     scope.launch { mock.agents.collect { _agents.value = it } }
                     scope.launch { mock.alerts.collect { _alerts.value = it } }
@@ -98,6 +91,7 @@ class RaamsesGatewayClient {
     }
 
     fun disconnect() {
+        Log.d(TAG, "DISCONNECT")
         connectionJob?.cancel()
         heartbeatJob?.cancel()
         statsJob?.cancel()
@@ -141,8 +135,8 @@ class RaamsesGatewayClient {
 
     private suspend fun connectHttp(config: GatewayConnection) = withContext(Dispatchers.IO) {
         val baseUrl = "http${if (config.use_tls) "s" else ""}://${config.host}:${config.port}"
+        Log.d(TAG, "HTTP → trying $baseUrl${config.stats_path}")
 
-        // Fetch stats to verify connectivity
         try {
             val statsUrl = URL("$baseUrl${config.stats_path}")
             val conn = statsUrl.openConnection() as HttpURLConnection
@@ -150,13 +144,15 @@ class RaamsesGatewayClient {
             conn.readTimeout = 5000
             conn.connect()
 
+            Log.d(TAG, "HTTP ← ${conn.responseCode} from $baseUrl${config.stats_path}")
             if (conn.responseCode == 200) {
                 val body = conn.inputStream.bufferedReader().readText()
+                Log.v(TAG, "HTTP body ($baseUrl${config.stats_path}): ${body.take(500)}")
                 parseServerStatus(body)
             }
             conn.disconnect()
-        } catch (_: Exception) {
-            // Stats server might not be running; try API endpoint
+        } catch (e: Exception) {
+            Log.w(TAG, "HTTP stats failed: ${e.javaClass.simpleName} — trying API endpoint")
             try {
                 val apiUrl = URL("$baseUrl${config.api_path}/status")
                 val conn = apiUrl.openConnection() as HttpURLConnection
@@ -240,6 +236,7 @@ class RaamsesGatewayClient {
     // ── Heartbeat ──
 
     private fun startHeartbeat(config: GatewayConnection) {
+        Log.d(TAG, "HEARTBEAT started — every 8s → ${config.host}:${config.port}")
         heartbeatJob = scope.launch {
             while (isActive) {
                 delay(8000)
@@ -263,7 +260,7 @@ class RaamsesGatewayClient {
                     }
                     conn.connect()
                     conn.disconnect()
-                } catch (_: Exception) { /* heartbeat failed, will retry */ }
+                } catch (e: Exception) { Log.v(TAG, "HEARTBEAT: ${e.javaClass.simpleName}") }
             }
         }
     }
@@ -271,6 +268,7 @@ class RaamsesGatewayClient {
     // ── Stats polling ──
 
     private fun startStatsPolling(config: GatewayConnection) {
+        Log.d(TAG, "STATS polling started — every 5s → ${config.host}:${config.port}${config.stats_path}")
         statsJob = scope.launch {
             while (isActive) {
                 delay(5000)
@@ -283,10 +281,11 @@ class RaamsesGatewayClient {
 
                     if (conn.responseCode == 200) {
                         val body = conn.inputStream.bufferedReader().readText()
+                        Log.v(TAG, "STATS ← ${body.take(300)}")
                         parseServerStatus(body)
                     }
                     conn.disconnect()
-                } catch (_: Exception) { /* stats unavailable */ }
+                } catch (e: Exception) { Log.v(TAG, "STATS poll: ${e.javaClass.simpleName}") }
             }
         }
     }
@@ -305,6 +304,7 @@ class RaamsesGatewayClient {
             try {
                 val baseUrl = "http${if (connectionConfig.use_tls) "s" else ""}://${connectionConfig.host}:${connectionConfig.port}"
                 val url = URL("$baseUrl${connectionConfig.api_path}/instructions")
+                Log.d(TAG, "CMD → POST $url: $command")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
                 conn.setRequestProperty("Content-Type", "application/json")
@@ -321,8 +321,10 @@ class RaamsesGatewayClient {
                     it.write(JSONObject(cmdPayload).toString())
                 }
 
+                Log.d(TAG, "CMD ← ${conn.responseCode}")
                 if (conn.responseCode == 200) {
                     val body = conn.inputStream.bufferedReader().readText()
+                    Log.v(TAG, "CMD response: ${body.take(300)}")
                     conn.disconnect()
                     return@withContext GatewayMessage(
                         id = UUID.randomUUID().toString(),
@@ -332,7 +334,7 @@ class RaamsesGatewayClient {
                     )
                 }
                 conn.disconnect()
-            } catch (_: Exception) { /* fall through to local handling */ }
+            } catch (e: Exception) { Log.w(TAG, "CMD failed: ${e.javaClass.simpleName}") }
         }
 
         // Local fallback processing
@@ -406,6 +408,7 @@ class RaamsesGatewayClient {
     }
 
     private fun parseServerStatus(body: String) {
+        Log.d(TAG, "PARSE ← ServerStatus: ${body.take(200)}")
         val status = ServerStatus.fromJson(JSONObject(body))
         _serverHealth.value = ServerHealth(
             cpuPercent = status.cpu_usage.removeSuffix("%").toFloatOrNull()?.div(100) ?: 0f,
