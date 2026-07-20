@@ -87,6 +87,7 @@ fun ConnectionScreen(
         Text("QUICK CONNECT", style = MaterialTheme.typography.labelMedium, color = TextMuted)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(
+                "Pi Gateway" to ("192.168.6.230" to 8765),
                 "Stats Server" to ("localhost" to 8080),
                 "Python Gateway" to ("localhost" to 42000),
                 "C# Server" to ("localhost" to 5000)
