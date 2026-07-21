@@ -40,6 +40,24 @@ class RaamsesGatewayClient {
     private val _gatewayMessages = MutableStateFlow<List<GatewayMessage>>(emptyList())
     val gatewayMessages: StateFlow<List<GatewayMessage>> = _gatewayMessages.asStateFlow()
 
+    private val _networkLog = MutableStateFlow<List<NetworkLogEntry>>(emptyList())
+    val networkLog: StateFlow<List<NetworkLogEntry>> = _networkLog.asStateFlow()
+
+    private fun logOut(content: String, protocol: String = "gateway") {
+        _networkLog.value = (_networkLog.value + NetworkLogEntry(
+            id = UUID.randomUUID().toString(),
+            timestampSec = System.currentTimeMillis() / 1000,
+            direction = "OUT", content = content.take(200), protocol = protocol
+        )).takeLast(200)
+    }
+    private fun logIn(content: String, protocol: String = "gateway") {
+        _networkLog.value = (_networkLog.value + NetworkLogEntry(
+            id = UUID.randomUUID().toString(),
+            timestampSec = System.currentTimeMillis() / 1000,
+            direction = "IN", content = content.take(200), protocol = protocol
+        )).takeLast(200)
+    }
+
     // ── Internal ──
 
     private var connectionJob: Job? = null
@@ -144,6 +162,7 @@ class RaamsesGatewayClient {
     private suspend fun connectHttp(config: GatewayConnection) = withContext(Dispatchers.IO) {
         val baseUrl = "http${if (config.use_tls) "s" else ""}://${config.host}:${config.port}"
         Log.d(TAG, "HTTP → trying $baseUrl${config.stats_path}")
+        logOut("GET $baseUrl${config.stats_path}", "http")
 
         try {
             val statsUrl = URL("$baseUrl${config.stats_path}")
@@ -153,9 +172,11 @@ class RaamsesGatewayClient {
             conn.connect()
 
             Log.d(TAG, "HTTP ← ${conn.responseCode} from $baseUrl${config.stats_path}")
+            logIn("HTTP ${conn.responseCode} $baseUrl${config.stats_path}", "http")
             if (conn.responseCode == 200) {
                 val body = conn.inputStream.bufferedReader().readText()
                 Log.v(TAG, "HTTP body ($baseUrl${config.stats_path}): ${body.take(500)}")
+                logIn(body.take(300), "http")
                 parseServerStatus(body)
             }
             conn.disconnect()
@@ -256,16 +277,26 @@ class RaamsesGatewayClient {
         val deviceType = "android_console"
         val register = "REGISTER:$deviceId|$deviceType|1.0\n"
         Log.d(TAG, "GATEWAY → $register")
+        logOut(register.trim())
         writer.write(register)
         writer.flush()
 
         val ack = reader.readLine() ?: throw Exception("No REGISTER_ACK")
         Log.d(TAG, "GATEWAY ← $ack")
+        logIn(ack.trim())
         if (ack.startsWith("REGISTER_ACK:true")) {
             val parts = ack.split("|")
+            val serverTime = parts.getOrElse(1) { "" }
+            val schemaVersion = parts.getOrElse(2) { "" }
+            val serverName = parts.getOrElse(3) { "" }
             _connectionState.value = _connectionState.value.copy(
-                serverVersion = parts.getOrElse(3) { "" }
+                serverDevice = serverName,
+                serverVersion = schemaVersion,
+                lastHeartbeatSecAgo = 0
             )
+            Log.i(TAG, "REGISTERED ✓ server=$serverName schema=$schemaVersion time=$serverTime")
+        } else {
+            Log.w(TAG, "REGISTER rejected: $ack")
         }
 
         // Read loop — parse agent list responses
@@ -274,6 +305,7 @@ class RaamsesGatewayClient {
                 while (isActive) {
                     val line = gatewayReader?.readLine() ?: break
                     Log.v(TAG, "GATEWAY recv: $line")
+                    logIn(line.trim())
                     if (line.startsWith("Connected agents") || line.contains("type=")) {
                         parseAgentListLine(line)
                     }
@@ -288,6 +320,7 @@ class RaamsesGatewayClient {
         scope.launch(Dispatchers.IO) {
             try {
                 Log.d(TAG, "GATEWAY → $cmd")
+                logOut(cmd)
                 gatewayWriter?.write("$cmd\n")
                 gatewayWriter?.flush()
             } catch (e: Exception) {

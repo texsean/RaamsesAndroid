@@ -110,3 +110,11 @@ data class ConnectionState(
     val maxAgents: Int = 4,
     val lastHeartbeatSecAgo: Long? = null
 )
+
+data class NetworkLogEntry(
+    val id: String,
+    val timestampSec: Long,
+    val direction: String, // "IN" or "OUT"
+    val content: String,
+    val protocol: String = "gateway" // "gateway", "http", "tcp"
+)

@@ -22,6 +22,7 @@ import com.raamses.console.ui.alerts.AlertsScreen
 import com.raamses.console.ui.dashboard.DashboardScreen
 import com.raamses.console.ui.gateway.ConnectionScreen
 import com.raamses.console.ui.gateway.GatewayScreen
+import com.raamses.console.ui.logs.LogScreen
 import com.raamses.console.ui.theme.*
 import java.util.UUID
 
@@ -33,9 +34,10 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
         fun createRoute(agentId: String) = "agent/$agentId"
     }
     data object Connection : Screen("connection", "Connection", Icons.Default.Settings)
+    data object Logs : Screen("logs", "Logs", Icons.Default.List)
 }
 
-val bottomNavItems = listOf(Screen.Gateway, Screen.Dashboard, Screen.Alerts)
+val bottomNavItems = listOf(Screen.Gateway, Screen.Dashboard, Screen.Alerts, Screen.Logs)
 
 @Composable
 fun RaamsesNavHost(
@@ -54,6 +56,7 @@ fun RaamsesNavHost(
     val serverHealth by gatewayClient.serverHealth.collectAsState()
     val connectionState by gatewayClient.connectionState.collectAsState()
     val gatewayMessages by gatewayClient.gatewayMessages.collectAsState()
+    val networkLog by gatewayClient.networkLog.collectAsState()
 
     // Initialize with mock data if no connection
     LaunchedEffect(Unit) {
@@ -163,6 +166,11 @@ fun RaamsesNavHost(
                     onDisconnect = { gatewayClient.disconnect() },
                     onDismiss = { navController.popBackStack() }
                 )
+            }
+
+            // ── Logs Tab ──
+            composable(Screen.Logs.route) {
+                LogScreen(entries = networkLog)
             }
         }
     }
