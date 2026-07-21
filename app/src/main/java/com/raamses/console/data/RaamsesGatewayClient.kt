@@ -17,7 +17,6 @@ import java.net.URL
 import java.util.UUID
 
 class RaamsesGatewayClient {
-    companion object { private const val TAG = "RAAMSES" }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val deviceId = "android-console-${UUID.randomUUID().toString().take(8)}"
@@ -613,6 +612,7 @@ class RaamsesGatewayClient {
     """.trimIndent()
 
     companion object {
+        private const val TAG = "RAAMSES"
         private fun statusEmoji(status: String): String = when (status) {
             "ACTIVE" -> "🟢"
             "QUIET" -> "🟡"
