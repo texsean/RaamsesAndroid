@@ -47,6 +47,9 @@ class RaamsesGatewayClient {
     private var heartbeatJob: Job? = null
     private var statsJob: Job? = null
     private var connectionConfig: GatewayConnection = GatewayConnection()
+    private var gatewaySocket: Socket? = null
+    private var gatewayWriter: OutputStreamWriter? = null
+    private var gatewayReader: BufferedReader? = null
 
     fun connect(config: GatewayConnection) {
         disconnect()
@@ -60,6 +63,10 @@ class RaamsesGatewayClient {
                 )
 
                 when {
+                    config.port == 8765 -> {
+                        Log.d(TAG, "Using GATEWAY text protocol for port 8765")
+                        connectGateway(config)
+                    }
                     config.port == 42000 || config.api_path.contains("tcp") -> {
                         Log.d(TAG, "Using TCP mode for port 42000")
                         connectTcp(config)
@@ -95,6 +102,8 @@ class RaamsesGatewayClient {
         connectionJob?.cancel()
         heartbeatJob?.cancel()
         statsJob?.cancel()
+        try { gatewaySocket?.close() } catch (_: Exception) {}
+        gatewaySocket = null; gatewayWriter = null; gatewayReader = null
         _connectionState.value = ConnectionState()
     }
 
@@ -233,33 +242,112 @@ class RaamsesGatewayClient {
         }
     }
 
+    // ── Gateway text protocol (port 8765) ──
+
+    private suspend fun connectGateway(config: GatewayConnection) = withContext(Dispatchers.IO) {
+        val socket = Socket()
+        socket.connect(InetSocketAddress(config.host, config.port), 5000)
+        gatewaySocket = socket
+        val writer = OutputStreamWriter(socket.getOutputStream())
+        val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
+        gatewayWriter = writer
+        gatewayReader = reader
+
+        // Register
+        val deviceType = "android_console"
+        val register = "REGISTER:$deviceId|$deviceType|1.0\n"
+        Log.d(TAG, "GATEWAY → $register")
+        writer.write(register)
+        writer.flush()
+
+        val ack = reader.readLine() ?: throw Exception("No REGISTER_ACK")
+        Log.d(TAG, "GATEWAY ← $ack")
+        if (ack.startsWith("REGISTER_ACK:true")) {
+            val parts = ack.split("|")
+            _connectionState.value = _connectionState.value.copy(
+                serverVersion = parts.getOrElse(3) { "" }
+            )
+        }
+
+        // Read loop — parse agent list responses
+        scope.launch {
+            try {
+                while (isActive) {
+                    val line = gatewayReader?.readLine() ?: break
+                    Log.v(TAG, "GATEWAY recv: $line")
+                    if (line.startsWith("Connected agents") || line.contains("type=")) {
+                        parseAgentListLine(line)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "GATEWAY read loop: ${e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    private fun sendGatewayCommand(cmd: String) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "GATEWAY → $cmd")
+                gatewayWriter?.write("$cmd\n")
+                gatewayWriter?.flush()
+            } catch (e: Exception) {
+                Log.w(TAG, "GATEWAY send: ${e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    private fun parseAgentListLine(line: String) {
+        // Parse: "  ● agent-xxx type=cyd task='75%...'"
+        // or:    "Connected agents (3):"
+        val agentPattern = Regex("""[●◐○]\s+(\S+)\s+type=(\S+)\s+task='(.+?)'""")
+        agentPattern.findAll(line).forEach { match ->
+            val (name, type, task) = match.destructured
+            val existing = _agents.value.toMutableList()
+            val idx = existing.indexOfFirst { it.agentId == name }
+            val agent = AgentStatus(
+                agentId = name,
+                name = name,
+                status = if (line.contains("●")) "ACTIVE" else "IDLE",
+                objective = task,
+                currentOperation = task
+            )
+            if (idx >= 0) existing[idx] = agent else existing.add(agent)
+            _agents.value = existing
+        }
+    }
+
     // ── Heartbeat ──
 
     private fun startHeartbeat(config: GatewayConnection) {
-        Log.d(TAG, "HEARTBEAT started — every 8s → ${config.host}:${config.port}")
+        val isGateway = config.port == 8765
+        Log.d(TAG, "HEARTBEAT started — every 8s → ${config.host}:${config.port} (${if (isGateway) "text" else "HTTP"})")
         heartbeatJob = scope.launch {
             while (isActive) {
                 delay(8000)
                 try {
-                    val baseUrl = "http${if (config.use_tls) "s" else ""}://${config.host}:${config.port}"
-                    val url = URL("$baseUrl${config.api_path}/status")
-                    val conn = url.openConnection() as HttpURLConnection
-                    conn.requestMethod = "POST"
-                    conn.setRequestProperty("Content-Type", "application/json")
-                    conn.doOutput = true
-                    conn.connectTimeout = 3000
-                    conn.readTimeout = 3000
-
-                    val heartbeat = mapOf(
-                        "device_id" to deviceId,
-                        "uptime_seconds" to (System.currentTimeMillis() / 1000),
-                        "status" to "online"
-                    )
-                    OutputStreamWriter(conn.outputStream).use {
-                        it.write(JSONObject(heartbeat).toString())
+                    if (isGateway) {
+                        sendGatewayCommand("heartbeat")
+                    } else {
+                        val baseUrl = "http${if (config.use_tls) "s" else ""}://${config.host}:${config.port}"
+                        val url = URL("$baseUrl${config.api_path}/status")
+                        val conn = url.openConnection() as HttpURLConnection
+                        conn.requestMethod = "POST"
+                        conn.setRequestProperty("Content-Type", "application/json")
+                        conn.doOutput = true
+                        conn.connectTimeout = 3000
+                        conn.readTimeout = 3000
+                        val heartbeat = mapOf(
+                            "device_id" to deviceId,
+                            "uptime_seconds" to (System.currentTimeMillis() / 1000),
+                            "status" to "online"
+                        )
+                        OutputStreamWriter(conn.outputStream).use {
+                            it.write(JSONObject(heartbeat).toString())
+                        }
+                        conn.connect()
+                        conn.disconnect()
                     }
-                    conn.connect()
-                    conn.disconnect()
                 } catch (e: Exception) { Log.v(TAG, "HEARTBEAT: ${e.javaClass.simpleName}") }
             }
         }
@@ -268,23 +356,27 @@ class RaamsesGatewayClient {
     // ── Stats polling ──
 
     private fun startStatsPolling(config: GatewayConnection) {
-        Log.d(TAG, "STATS polling started — every 5s → ${config.host}:${config.port}${config.stats_path}")
+        val isGateway = config.port == 8765
+        Log.d(TAG, "STATS polling — every 5s → ${config.host}:${config.port} (${if (isGateway) "gateway agents" else "HTTP"})")
         statsJob = scope.launch {
             while (isActive) {
                 delay(5000)
                 try {
-                    val baseUrl = "http${if (config.use_tls) "s" else ""}://${config.host}:${config.port}"
-                    val url = URL("$baseUrl${config.stats_path}")
-                    val conn = url.openConnection() as HttpURLConnection
-                    conn.connectTimeout = 3000
-                    conn.readTimeout = 3000
-
-                    if (conn.responseCode == 200) {
-                        val body = conn.inputStream.bufferedReader().readText()
-                        Log.v(TAG, "STATS ← ${body.take(300)}")
-                        parseServerStatus(body)
+                    if (isGateway) {
+                        sendGatewayCommand("agents")
+                    } else {
+                        val baseUrl = "http${if (config.use_tls) "s" else ""}://${config.host}:${config.port}"
+                        val url = URL("$baseUrl${config.stats_path}")
+                        val conn = url.openConnection() as HttpURLConnection
+                        conn.connectTimeout = 3000
+                        conn.readTimeout = 3000
+                        if (conn.responseCode == 200) {
+                            val body = conn.inputStream.bufferedReader().readText()
+                            Log.v(TAG, "STATS ← ${body.take(300)}")
+                            parseServerStatus(body)
+                        }
+                        conn.disconnect()
                     }
-                    conn.disconnect()
                 } catch (e: Exception) { Log.v(TAG, "STATS poll: ${e.javaClass.simpleName}") }
             }
         }
@@ -302,6 +394,17 @@ class RaamsesGatewayClient {
         // Try sending to server first
         if (_connectionState.value.connected) {
             try {
+                if (connectionConfig.port == 8765) {
+                    // Gateway text protocol — send slash command directly
+                    sendGatewayCommand(command)
+                    return@withContext GatewayMessage(
+                        id = UUID.randomUUID().toString(),
+                        text = "Sent: $command",
+                        isFromUser = false,
+                        timestampSec = now
+                    )
+                }
+                // HTTP mode
                 val baseUrl = "http${if (connectionConfig.use_tls) "s" else ""}://${connectionConfig.host}:${connectionConfig.port}"
                 val url = URL("$baseUrl${connectionConfig.api_path}/instructions")
                 Log.d(TAG, "CMD → POST $url: $command")
