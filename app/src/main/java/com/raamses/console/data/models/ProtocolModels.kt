@@ -407,7 +407,7 @@ enum class VerifierMode(val label: String, val description: String) {
 // ── Connection Config ──
 
 data class GatewayConnection(
-    val host: String = "localhost", val port: Int = 8080,
+    val host: String = "localhost", val port: Int = 8765,
     val use_tls: Boolean = false, val api_path: String = "/api",
     val stats_path: String = "/stats", val auto_reconnect: Boolean = true,
     val reconnect_delay_ms: Long = 5000

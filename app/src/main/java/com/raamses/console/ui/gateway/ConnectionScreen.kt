@@ -57,7 +57,7 @@ fun ConnectionScreen(
             value = port,
             onValueChange = { port = it.filter { c -> c.isDigit() } },
             label = { Text("Port") },
-            placeholder = { Text("8080") },
+            placeholder = { Text("8765") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -88,7 +88,7 @@ fun ConnectionScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(
                 "Pi Gateway" to ("192.168.6.230" to 8765),
-                "Stats Server" to ("localhost" to 8080),
+                "Stats Server" to ("localhost" to 8765),
                 "Python Gateway" to ("localhost" to 42000),
                 "C# Server" to ("localhost" to 5000)
             ).forEach { (name, cfg) ->
@@ -121,7 +121,7 @@ fun ConnectionScreen(
             onClick = {
                 val config = GatewayConnection(
                     host = host.ifBlank { "localhost" },
-                    port = port.toIntOrNull() ?: 8080,
+                    port = port.toIntOrNull() ?: 8765,
                     use_tls = useTls
                 )
                 onConnect(config)

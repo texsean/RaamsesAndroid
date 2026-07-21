@@ -103,7 +103,7 @@ data class GatewayMessage(
 data class ConnectionState(
     val connected: Boolean = false,
     val host: String = "",
-    val port: Int = 8080,
+    val port: Int = 8765,
     val serverDevice: String = "",
     val serverVersion: String = "",
     val tier: String = "free",
