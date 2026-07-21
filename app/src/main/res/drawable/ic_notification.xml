@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Minimal "R" silhouette for notification bar (tinted by system) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M5,2 L5,22 L11,22 C16,22 20,18 20,14
+            C20,10 16,8 13,7 L18,2 L14,2 L10,7 L10,2 Z
+            M10,11 L13,11 C16,11 17,12 17,14
+            C17,16 15,17 13,17 L10,17 Z"/>
+</vector>
