@@ -13,7 +13,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raamses.console.data.models.NetworkLogEntry
-import com.raamses.console.ui.components.FormatUtils.formatSecondsAgo
 import com.raamses.console.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
