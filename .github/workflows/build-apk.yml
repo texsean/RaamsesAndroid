@@ -35,7 +35,26 @@ jobs:
       - name: Build Debug APK
         run: |
           set -o pipefail
+          set +e
           ./gradlew assembleDebug --stacktrace --info 2>&1 | tee build.log
+          code=${PIPESTATUS[0]}
+          set -e
+          if [ "$code" -ne 0 ]; then
+            echo "::group::Gradle failure excerpts"
+            # Surface real compiler/Gradle errors as annotations (public without token)
+            grep -E '^(e: |w: |FAILURE:|\\* What went wrong:|Execution failed|Unresolved reference|error:|e: file://)' build.log | tail -n 80 | while IFS= read -r line; do
+              echo "::error title=Gradle::$line"
+            done
+            # Also dump a short tail for the job summary
+            {
+              echo '### Build failed'
+              echo '```'
+              tail -n 100 build.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::endgroup::"
+            exit "$code"
+          fi
         env:
           GRADLE_OPTS: -Dorg.gradle.daemon=false -Dkotlin.compiler.execution.strategy=in-process
 
