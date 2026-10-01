@@ -11,8 +11,8 @@ android {
         applicationId = "com.raamses.console"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.2.3"
+        versionCode = 6
+        versionName = "1.3.0"
     }
     buildTypes {
         release { isMinifyEnabled = false }

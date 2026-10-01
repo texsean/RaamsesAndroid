@@ -2,12 +2,17 @@ package com.raamses.console.ui.navigation
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -23,21 +28,22 @@ import com.raamses.console.ui.dashboard.DashboardScreen
 import com.raamses.console.ui.gateway.ConnectionScreen
 import com.raamses.console.ui.gateway.GatewayScreen
 import com.raamses.console.ui.logs.LogScreen
+import com.raamses.console.ui.terminal.TerminalScreen
 import com.raamses.console.ui.theme.*
-import java.util.UUID
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
-    data object Gateway : Screen("gateway", "Gateway", Icons.Default.Terminal)
-    data object Dashboard : Screen("dashboard", "Dashboard", Icons.Default.Dashboard)
-    data object Alerts : Screen("alerts", "Alerts", Icons.Default.Notifications)
-    data object AgentDetail : Screen("agent/{agentId}", "Agent", Icons.Default.Computer) {
+    data object Gateway : Screen("gateway", "Gateway", Icons.Filled.Home)
+    data object Dashboard : Screen("dashboard", "Dashboard", Icons.Filled.Dashboard)
+    data object Alerts : Screen("alerts", "Alerts", Icons.Filled.Notifications)
+    data object AgentDetail : Screen("agent/{agentId}", "Agent", Icons.Filled.Computer) {
         fun createRoute(agentId: String) = "agent/$agentId"
     }
-    data object Connection : Screen("connection", "Connection", Icons.Default.Settings)
-    data object Logs : Screen("logs", "Logs", Icons.Default.List)
+    data object Connection : Screen("connection", "Connection", Icons.Filled.Settings)
+    data object Logs : Screen("logs", "Logs", Icons.AutoMirrored.Filled.List)
+    data object Terminal : Screen("terminal", "Terminal", Icons.Filled.Terminal)
 }
 
-val bottomNavItems = listOf(Screen.Gateway, Screen.Dashboard, Screen.Alerts, Screen.Logs)
+val bottomNavItems = listOf(Screen.Gateway, Screen.Dashboard, Screen.Alerts, Screen.Logs, Screen.Terminal)
 
 @Composable
 fun RaamsesNavHost(
@@ -171,6 +177,11 @@ fun RaamsesNavHost(
             // ── Logs Tab ──
             composable(Screen.Logs.route) {
                 LogScreen(entries = networkLog)
+            }
+
+            // ── Full Terminal (OpenSSH, Python, pip, Hermes tools) ──
+            composable(Screen.Terminal.route) {
+                TerminalScreen()
             }
         }
     }
